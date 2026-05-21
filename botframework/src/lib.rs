@@ -1,3 +1,7 @@
+// Re-export derive macros when the 'derive' feature is enabled
+#[cfg(feature = "derive")]
+pub use botframework_derive::ToolParameters;
+
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
@@ -16,6 +20,22 @@ use teloxide::{
         ParseMode, User,
     },
 };
+
+/// Trait for the `#[derive(MyTrait)]` macro
+///
+/// # Example
+/// ```rust
+/// use botframework::MyTrait;
+///
+/// #[derive(MyTrait)]
+/// struct MyStruct;
+///
+/// let s = MyStruct;
+/// assert_eq!(s.my_trait_method(), "MyStruct");
+/// ```
+pub trait MyTrait {
+    fn my_trait_method(&self) -> String;
+}
 
 pub mod ai;
 pub mod infisical;

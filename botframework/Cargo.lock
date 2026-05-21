@@ -140,7 +140,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-openai",
- "botframework-derive",
  "chrono",
  "dotenvy",
  "enum_dispatch",
@@ -153,15 +152,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "v_escape",
-]
-
-[[package]]
-name = "botframework-derive"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
