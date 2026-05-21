@@ -5,9 +5,13 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.102"
-async-openai = "0.38.2"
+async-openai = {version = "0.38", features = ["chat-completion", "audio", "byot"]}
 chrono = "0.4.44"
+enum_dispatch = "0.3.13"
+infisical = "0.0.3"
 serde = "1.0.228"
 serde_json = "1.0.149"
 teloxide = "0.17.0"
 tokio = "1.52.3"
+tracing = "0.1.44"
+v_escape = "0.19.0"
