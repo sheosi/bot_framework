@@ -9,6 +9,7 @@ use std::{
 
 use anyhow::Context;
 use chrono::{DateTime, Utc};
+use clap::Parser;
 use dotenvy::dotenv;
 use teloxide::{
     Bot,
@@ -363,7 +364,7 @@ impl TgBot {
 }
 
 /// Loads env vars and tracing
-pub fn init() {
+pub fn init() -> Cli {
     // Load environment variables
     dotenv().ok();
 
@@ -371,6 +372,8 @@ pub fn init() {
     tracing_subscriber::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
+
+    Cli::parse()
 }
 
 pub fn get_port() -> u16 {
@@ -378,4 +381,17 @@ pub fn get_port() -> u16 {
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(8079)
+}
+
+#[derive(Parser)]
+#[command(name = "go7rs")]
+#[command(about = "Go7 Telegram Bot - Rust rewrite")]
+struct Cli {
+    /// Run health check
+    #[arg(long = "check")]
+    check: bool,
+
+    /// Run database migrations
+    #[arg(long = "migrate")]
+    migrate: bool,
 }
