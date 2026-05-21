@@ -353,7 +353,7 @@ pub fn init() {
         .init();
 }
 
-fn get_port() -> u16 {
+pub fn get_port() -> u16 {
     std::env::var("PORT")
         .ok()
         .and_then(|p| p.parse().ok())
