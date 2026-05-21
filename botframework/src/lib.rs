@@ -386,7 +386,7 @@ pub fn get_port() -> u16 {
 #[derive(Parser)]
 #[command(name = "go7rs")]
 #[command(about = "Go7 Telegram Bot - Rust rewrite")]
-struct Cli {
+pub struct Cli {
     /// Run health check
     #[arg(long = "check")]
     pub check: bool,
