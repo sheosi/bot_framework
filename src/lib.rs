@@ -18,6 +18,7 @@ use teloxide::{
 
 pub mod ai;
 pub mod infisical;
+pub mod utils;
 
 pub fn props_to_json(props: Properties) -> serde_json::Value {
     let required: Vec<&'static str> = props.iter().map(|p| p.name).collect();
