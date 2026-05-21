@@ -389,9 +389,9 @@ pub fn get_port() -> u16 {
 struct Cli {
     /// Run health check
     #[arg(long = "check")]
-    check: bool,
+    pub check: bool,
 
     /// Run database migrations
     #[arg(long = "migrate")]
-    migrate: bool,
+    pub migrate: bool,
 }
