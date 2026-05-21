@@ -1,7 +1,7 @@
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
 use serde::Serialize;
 
-use crate::api;
+use crate::{api, get_port};
 
 /// Health check response
 #[derive(Serialize)]
@@ -27,13 +27,13 @@ async fn health_handler() -> impl IntoResponse {
 }
 
 /// Run the API server
-pub fn run_api() -> Result<()> {
+pub fn run_healthcheck_api() {
     // Get port for health check server
     let port = get_port();
 
     let router = api::create_router();
 
-    info!("Health check API listening on port {}", port);
+    tracing::info!("Health check API listening on port {}", port);
 
     tokio::spawn(async move {
         let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port))
@@ -41,9 +41,7 @@ pub fn run_api() -> Result<()> {
             .expect("Failed to run api");
 
         if let Err(e) = axum::serve(listener, router).await {
-            error!("API server error: {}", e);
+            tracing::error!("API server error: {}", e);
         }
     });
-
-    Ok(())
 }
