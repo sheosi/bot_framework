@@ -17,7 +17,8 @@ use teloxide::{
     payloads::SendMessageSetters,
     requests::Requester,
     types::{
-        ChatId, FileId, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, MessageId, ParseMode,
+        ChatId, FileId, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, MessageId,
+        ParseMode, UserId,
     },
 };
 
@@ -212,6 +213,7 @@ pub use md_replace::escape_md;
 pub struct TgBot {
     bot: Bot,
     username: String,
+    id: UserId,
 }
 
 type Result<T> = core::result::Result<T, anyhow::Error>;
@@ -220,15 +222,17 @@ impl TgBot {
     pub async fn new(key: String) -> Self {
         let bot = Bot::new(key);
 
-        let username = bot
-            .get_me()
-            .await
-            .expect("Failed to get self bot")
+        let this_bot = bot.get_me().await.expect("Failed to get self bot");
+        let username = this_bot
             .username
             .clone()
             .expect("Me returned but had no name");
 
-        Self { bot, username }
+        Self {
+            bot,
+            username,
+            id: this_bot.id,
+        }
     }
 
     pub fn get_inner(&self) -> Bot {
@@ -361,6 +365,10 @@ impl TgBot {
     /// Get bot user info
     pub fn get_bot_username(&self) -> &str {
         self.username.as_str()
+    }
+
+    pub fn get_bot_id(&self) -> UserId {
+        self.id
     }
 
     pub async fn send_document<P: Into<PathBuf>>(&self, chat_id: ChatId, file: P) -> Result<()> {
