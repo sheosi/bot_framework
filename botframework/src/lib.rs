@@ -17,8 +17,7 @@ use teloxide::{
     payloads::SendMessageSetters,
     requests::Requester,
     types::{
-        ChatId, FileId, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, MessageId,
-        ParseMode, User,
+        ChatId, FileId, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, MessageId, ParseMode,
     },
 };
 
@@ -212,13 +211,24 @@ pub use md_replace::escape_md;
 #[derive(Clone)]
 pub struct TgBot {
     bot: Bot,
+    username: String,
 }
 
 type Result<T> = core::result::Result<T, anyhow::Error>;
 
 impl TgBot {
-    pub fn new(key: String) -> Self {
-        Self { bot: Bot::new(key) }
+    pub async fn new(key: String) -> Self {
+        let bot = Bot::new(key);
+
+        let username = bot
+            .get_me()
+            .await
+            .expect("Failed to get self bot")
+            .username
+            .clone()
+            .expect("Me returned but had no name");
+
+        Self { bot, username }
     }
 
     pub fn get_inner(&self) -> Bot {
@@ -349,9 +359,8 @@ impl TgBot {
     }
 
     /// Get bot user info
-    pub async fn get_bot_user(&self) -> Result<User> {
-        let me = self.bot.get_me().await?;
-        Ok(me.user)
+    pub fn get_bot_username(&self) -> &str {
+        self.username.as_str()
     }
 
     pub async fn send_document<P: Into<PathBuf>>(&self, chat_id: ChatId, file: P) -> Result<()> {
@@ -360,6 +369,20 @@ impl TgBot {
             .send_document(chat_id, InputFile::file(path))
             .await?;
         Ok(())
+    }
+
+    /// Extract command text, removing @botname in groups, if it says command@bot
+    /// returns true on the second return
+    pub fn extract_command_text<'a>(&self, text: &'a str) -> (&'a str, bool) {
+        let bot_handle = self.get_bot_username();
+
+        if let Some(idx) = text.find(&format!("@{}", bot_handle)) {
+            let after_handle = &text[idx + bot_handle.len() + 1..];
+            let before_handle = &text[..idx + bot_handle.len()];
+            (after_handle.trim(), before_handle == "command")
+        } else {
+            (text, false)
+        }
     }
 }
 

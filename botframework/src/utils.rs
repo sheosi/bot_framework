@@ -23,3 +23,23 @@ pub async fn run_health_check() -> Result<(), anyhow::Error> {
         }
     }
 }
+
+pub fn create_ai_fun(
+    name: String,
+    description: String,
+    params_org: Vec<Property>,
+) -> ChatCompletionTools {
+    let strict = Some(params_org.len() > 0);
+    ChatCompletionTools::Function(async_openai::types::chat::ChatCompletionTool {
+        function: FunctionObject {
+            name,
+            description: Some(description),
+            parameters: if params_org.len() > 0 {
+                Some(props_to_json(params_org))
+            } else {
+                None
+            },
+            strict,
+        },
+    })
+}
