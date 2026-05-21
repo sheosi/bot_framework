@@ -5,6 +5,7 @@ use std::{
 
 use anyhow::Context;
 use chrono::{DateTime, Utc};
+use dotenvy::dotenv;
 use teloxide::{
     Bot,
     net::Download,
@@ -339,4 +340,22 @@ impl TgBot {
             .await?;
         Ok(())
     }
+}
+
+/// Loads env vars and tracing
+pub fn init() {
+    // Load environment variables
+    dotenv().ok();
+
+    // Initialize tracing
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .init();
+}
+
+fn get_port() -> u16 {
+    std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(8079)
 }

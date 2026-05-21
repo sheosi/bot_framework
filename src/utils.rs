@@ -1,5 +1,5 @@
 /// Run health check
-async fn run_health_check() -> Result<()> {
+pub async fn run_health_check() -> Result<(), anyhow::Error> {
     use reqwest::Client;
 
     let port = std::env::var("PORT")
