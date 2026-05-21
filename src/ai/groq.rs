@@ -3,7 +3,7 @@ use async_openai::types::chat::{
     CreateChatCompletionRequest,
 };
 
-use crate::framework::ai::{AiProvider, ChatCompletionResponseTrait};
+use super::{AiProvider, ChatCompletionResponseTrait};
 
 pub struct GroqProvider;
 

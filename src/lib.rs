@@ -108,19 +108,19 @@ pub trait ToolParameters {
 
 /// Tool trait for AI function calling
 #[enum_dispatch::enum_dispatch]
-pub trait Tool: Send + Sync {
+pub trait Tool<T>: Send + Sync {
     fn name(&self) -> &'static str;
     fn description(&self) -> &'static str;
     fn parameters(&self) -> Properties;
     async fn tool_call(
         &self,
-        ctx: &mut crate::services::association::AssociationContext,
+        ctx: &mut T,
         chat_id: ChatId,
         arguments: &str,
     ) -> anyhow::Result<ToolCallAction>;
     async fn handle_callback(
         &self,
-        _ctx: &mut crate::services::association::AssociationContext,
+        _ctx: &mut T,
         _callback_data: &str,
         _delayed_action: DelayedAction,
     ) -> anyhow::Result<String> {

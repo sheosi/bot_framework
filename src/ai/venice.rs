@@ -2,7 +2,7 @@ use async_openai::types::chat::{
     ChatCompletionRequestMessage, ChatCompletionTools, CreateChatCompletionResponse,
 };
 
-use crate::framework::ai::AiProvider;
+use super::AiProvider;
 
 pub struct VeniceProvider;
 
