@@ -39,6 +39,7 @@ pub trait MyTrait {
 }
 
 pub mod ai;
+pub mod api;
 pub mod infisical;
 pub mod utils;
 
