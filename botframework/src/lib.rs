@@ -1,7 +1,3 @@
-// Re-export derive macros when the 'derive' feature is enabled
-#[cfg(feature = "derive")]
-pub use botframework_derive::ToolParameters;
-
 use clap::Parser;
 use dotenvy::dotenv;
 

@@ -16,6 +16,10 @@ use teloxide::{
     },
 };
 
+// Re-export derive macros when the 'derive' feature is enabled
+#[cfg(feature = "derive")]
+pub use botframework_derive::ToolParameters;
+
 pub fn props_to_json(props: Properties) -> serde_json::Value {
     let required: Vec<&'static str> = props.iter().map(|p| p.name).collect();
     let mut prop_map = HashMap::new();
@@ -427,7 +431,7 @@ impl TgBot {
         let (text, is_group_command) = self.extract_command_text(&text);
 
         if text.is_empty() && is_group_command {
-            let bot_handle = self.get_bot_username().clone();
+            let bot_handle = self.get_bot_username();
             let response = format!(
                 "Si quieres hablar conmigo escribe '/info@{} lo que quieres decir'",
                 bot_handle
