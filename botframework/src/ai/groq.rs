@@ -5,6 +5,7 @@ use async_openai::types::chat::{
 
 use super::{AiProvider, ChatCompletionResponseTrait};
 
+#[derive(Clone)]
 pub struct GroqProvider;
 
 #[derive(Debug, serde::Deserialize, Clone, PartialEq, serde::Serialize)]

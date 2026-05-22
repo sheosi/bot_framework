@@ -4,6 +4,7 @@ use async_openai::types::chat::{
 
 use super::AiProvider;
 
+#[derive(Clone)]
 pub struct VeniceProvider;
 
 impl AiProvider for VeniceProvider {
