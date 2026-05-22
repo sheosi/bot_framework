@@ -122,7 +122,7 @@ pub fn derive_tool_parameters(input: TokenStream) -> TokenStream {
 
             let expanded = quote! {
                 impl #impl_generics botframework::telegram::ToolParameters for #name #ty_generics #where_clause {
-                    fn parameters() -> botframework::Properties {
+                    fn parameters() -> botframework::telegram::Properties {
                         vec![#(#properties),*]
                     }
                 }
@@ -171,7 +171,7 @@ pub fn derive_tool_parameters(input: TokenStream) -> TokenStream {
             // For enums, parameters() returns a single Property describing the enum values
             let expanded = quote! {
                 impl botframework::telegram::ToolParameters for #name {
-                    fn parameters() -> botframework::Properties {
+                    fn parameters() -> botframework::telegram::Properties {
                         // Static array of enum variant names
                         static VARIANT_NAMES: &[&str] = &[#(#variant_name_strs),*];
 
