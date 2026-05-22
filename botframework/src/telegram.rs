@@ -8,11 +8,11 @@ use chrono::{DateTime, Utc};
 use teloxide::{
     Bot,
     net::Download,
-    payloads::SendMessageSetters,
+    payloads::{AnswerCallbackQuerySetters, SendMessageSetters},
     requests::Requester,
     types::{
-        ChatId, FileId, InlineKeyboardButton, InlineKeyboardMarkup, InputFile, MessageId,
-        ParseMode, User, UserId,
+        CallbackQuery, ChatId, FileId, InlineKeyboardButton, InlineKeyboardMarkup, InputFile,
+        MaybeInaccessibleMessage, MessageId, ParseMode, User, UserId,
     },
 };
 
@@ -478,6 +478,56 @@ impl TgBot {
                 tracing::warn!("Failed to transcribe voice: {}", e);
                 self.send_raw(chat_id, "Problemas al transcribir").await?;
                 Ok(None)
+            }
+        }
+    }
+
+    /// Handle callback query from inline keyboard
+    pub async fn handle_callback(
+        &self,
+        query: CallbackQuery,
+        check_allowed: impl AsyncFnOnce(String) -> bool + Send,
+    ) -> Result<Option<(String, Option<MaybeInaccessibleMessage>)>> {
+        let username = query.from.username.clone().unwrap_or_default();
+
+        // Acknowledge the callback
+        let id = query.id.clone();
+        self.bot.answer_callback_query(id).text("").await?;
+
+        if !check_allowed(username).await {
+            return Ok(None);
+        }
+
+        let data = query.data.clone().unwrap_or_default();
+
+        match data.as_str() {
+            "{}" => {
+                // Cancel operation
+                if let Some(msg) = query.message {
+                    self.replace_confirm(msg.chat().id, msg.id(), "Operación cancelada")
+                        .await?;
+                }
+                Ok(None)
+            }
+            "Delete" => {
+                // Delete operation - remove from list
+                if let Some(msg) = query.message {
+                    // Update keyboard to remove items
+                    self.replace_confirm(msg.chat().id, msg.id(), "Elemento eliminado")
+                        .await?;
+                }
+                Ok(None)
+            }
+            "Cancel" => {
+                if let Some(msg) = query.message {
+                    self.replace_confirm(msg.chat().id, msg.id(), "Lista terminada")
+                        .await?;
+                }
+                Ok(None)
+            }
+            _ => {
+                // Check for pending operation
+                Ok(Some((data, query.message)))
             }
         }
     }
