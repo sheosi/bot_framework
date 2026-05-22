@@ -393,7 +393,7 @@ impl TgBot {
         Ok(None)
     }
 
-    async fn process_msg(
+    pub async fn process_msg(
         &self,
         msg: teloxide::types::Message,
         ai: &AiService<GroqProvider>,
