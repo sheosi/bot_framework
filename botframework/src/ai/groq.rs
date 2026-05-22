@@ -33,12 +33,12 @@ impl AiProvider for GroqProvider {
     type CreateChatCompletionRequest = CreateChatCompletionRequest;
     type CreateChatCompletionResponse<'de> = GroqCreateChatCompletionResponse;
 
-    fn tts_model() -> &'static str {
-        "whisper-large-v3-turbo"
-    }
-
     fn base_url() -> &'static str {
         "https://api.groq.com/openai/v1"
+    }
+
+    fn tts_model() -> &'static str {
+        "whisper-large-v3-turbo"
     }
 
     fn create_chat_completion_request(

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Data, DeriveInput, Fields, LitStr, Meta, Type, parse_macro_input};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, LitStr, Meta, Type};
 
 /// Derive macro for generating ToolParameters implementation from struct fields.
 ///
@@ -99,7 +99,7 @@ pub fn derive_tool_parameters(input: TokenStream) -> TokenStream {
                         // For enum types, use the type's own parameters() to get enum values
                         quote! {
                             {
-                                let enum_props = <#ty as botframework::ToolParameters>::parameters();
+                                let enum_props = <#ty as botframework::telegram::ToolParameters>::parameters();
                                 if let Some(first) = enum_props.first() {
                                     if let Some(values) = first.kind.enum_values() {
                                         botframework::Property::string_enum(#field_name_str, #desc, values)
@@ -121,7 +121,7 @@ pub fn derive_tool_parameters(input: TokenStream) -> TokenStream {
                 .collect();
 
             let expanded = quote! {
-                impl #impl_generics botframework::ToolParameters for #name #ty_generics #where_clause {
+                impl #impl_generics botframework::telegram::ToolParameters for #name #ty_generics #where_clause {
                     fn parameters() -> botframework::Properties {
                         vec![#(#properties),*]
                     }
@@ -170,7 +170,7 @@ pub fn derive_tool_parameters(input: TokenStream) -> TokenStream {
 
             // For enums, parameters() returns a single Property describing the enum values
             let expanded = quote! {
-                impl botframework::ToolParameters for #name {
+                impl botframework::telegram::ToolParameters for #name {
                     fn parameters() -> botframework::Properties {
                         // Static array of enum variant names
                         static VARIANT_NAMES: &[&str] = &[#(#variant_name_strs),*];
