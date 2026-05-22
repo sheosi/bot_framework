@@ -76,24 +76,24 @@ pub fn derive_tool_parameters(input: TokenStream) -> TokenStream {
 
                     if is_string_type(ty) {
                         quote! {
-                            botframework::Property::string(#field_name_str, #desc)
+                            botframework::telegram::Property::string(#field_name_str, #desc)
                         }
                     } else if is_integer_type(ty) {
                         quote! {
-                            botframework::Property::integer(#field_name_str, #desc)
+                            botframework::telegram::Property::integer(#field_name_str, #desc)
                         }
                     } else if is_number_type(ty) {
                         quote! {
-                            botframework::Property::number(#field_name_str, #desc)
+                            botframework::telegram::Property::number(#field_name_str, #desc)
                         }
 
                     }else if is_bool_type(ty){
-                        quote!{botframework::Property::boolean(#field_name_str, #desc)}
+                        quote!{botframework::telegram::Property::boolean(#field_name_str, #desc)}
                     } else if is_vec_type(ty) {
                         // For Vec<T>, generate array type property
                         // Note: Vec support is simplified - items type info would require more complex handling
                         quote! {
-                            botframework::Property::string(#field_name_str, #desc)
+                            botframework::telegram::Property::string(#field_name_str, #desc)
                         }
                     } else if is_enum_type(ty) {
                         // For enum types, use the type's own parameters() to get enum values
@@ -102,12 +102,12 @@ pub fn derive_tool_parameters(input: TokenStream) -> TokenStream {
                                 let enum_props = <#ty as botframework::telegram::ToolParameters>::parameters();
                                 if let Some(first) = enum_props.first() {
                                     if let Some(values) = first.kind.enum_values() {
-                                        botframework::Property::string_enum(#field_name_str, #desc, values)
+                                        botframework::telegram::Property::string_enum(#field_name_str, #desc, values)
                                     } else {
-                                        botframework::Property::string(#field_name_str, #desc)
+                                        botframework::telegram::Property::string(#field_name_str, #desc)
                                     }
                                 } else {
-                                    botframework::Property::string(#field_name_str, #desc)
+                                    botframework::telegram::Property::string(#field_name_str, #desc)
                                 }
                             }
                         }
@@ -175,8 +175,8 @@ pub fn derive_tool_parameters(input: TokenStream) -> TokenStream {
                         // Static array of enum variant names
                         static VARIANT_NAMES: &[&str] = &[#(#variant_name_strs),*];
 
-                        vec![botframework::Property {
-                            kind: botframework::PropertyKind::Enum(VARIANT_NAMES),
+                        vec![botframework::telegram::Property {
+                            kind: botframework::telegram::PropertyKind::Enum(VARIANT_NAMES),
                             name: stringify!(#name),
                             description: "",
                         }]
