@@ -46,6 +46,7 @@ impl ChatCompletionResponseTrait for CreateChatCompletionResponse {
     }
 }
 
+#[derive(Clone)]
 pub struct AiService<A: AiProvider> {
     client: async_openai::Client<async_openai::config::OpenAIConfig>,
     prompt: String,
