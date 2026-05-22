@@ -9,6 +9,11 @@ pub struct VeniceProvider;
 impl AiProvider for VeniceProvider {
     type CreateChatCompletionRequest = VeniceCreateChatCompletionRequest;
     type CreateChatCompletionResponse<'de> = CreateChatCompletionResponse;
+
+    fn tts_model() -> &'static str {
+        "whisper-large-v3-turbo"
+    }
+
     fn base_url() -> &'static str {
         "https://api.venice.ai/api/v1"
     }

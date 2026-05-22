@@ -29,6 +29,7 @@ pub trait AiProvider {
     type CreateChatCompletionRequest: serde::Serialize;
 
     fn base_url() -> &'static str;
+    fn tts_model() -> &'static str;
     fn create_chat_completion_request(
         messages: Vec<ChatCompletionRequestMessage>,
         tools: Option<Vec<ChatCompletionTools>>,
@@ -131,7 +132,7 @@ impl<A: AiProvider> AiService<A> {
             .transcription()
             .create(CreateTranscriptionRequest {
                 file: AudioInput::from_vec_u8(file_name, contents),
-                model: "whisper-large-v3-turbo".into(),
+                model: A::tts_model().into(),
                 ..Default::default()
             })
             .await?;

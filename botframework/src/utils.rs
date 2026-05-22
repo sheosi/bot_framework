@@ -1,6 +1,6 @@
 use async_openai::types::chat::{ChatCompletionTools, FunctionObject};
 
-use crate::{Property, props_to_json};
+use crate::telegram::{Property, props_to_json};
 
 /// Run health check
 pub async fn run_health_check() -> Result<(), anyhow::Error> {
