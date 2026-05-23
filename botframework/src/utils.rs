@@ -47,3 +47,19 @@ pub fn create_ai_fun(
         },
     })
 }
+
+pub trait ErrMsg {
+    async fn err_msg(self, chat_id: ChatId, msg: &str, ctx: &mut AssociationContext) -> Self;
+}
+
+impl<T, E> ErrMsg for Result<T, E> {
+    async fn err_msg(self, chat_id: ChatId, msg: &str, ctx: &mut AssociationContext) -> Self {
+        if let Err(_) = self {
+            if let Err(e) = ctx.send_raw(chat_id, msg).await {
+                tracing::error!("Failed to send error msg: {e}")
+            }
+        }
+
+        self
+    }
+}
