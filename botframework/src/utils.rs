@@ -1,6 +1,7 @@
 use async_openai::types::chat::{ChatCompletionTools, FunctionObject};
+use teloxide::types::ChatId;
 
-use crate::telegram::{Property, props_to_json};
+use crate::telegram::{Property, TgBot, props_to_json};
 
 /// Run health check
 pub async fn run_health_check() -> Result<(), anyhow::Error> {
@@ -49,13 +50,18 @@ pub fn create_ai_fun(
 }
 
 pub trait ErrMsg {
-    async fn err_msg(self, chat_id: ChatId, msg: &str, ctx: &mut AssociationContext) -> Self;
+    fn err_msg(
+        self,
+        chat_id: ChatId,
+        msg: &str,
+        ctx: &TgBot,
+    ) -> impl std::future::Future<Output = Self>;
 }
 
 impl<T, E> ErrMsg for Result<T, E> {
-    async fn err_msg(self, chat_id: ChatId, msg: &str, ctx: &mut AssociationContext) -> Self {
+    async fn err_msg(self, chat_id: ChatId, msg: &str, bot: &TgBot) -> Self {
         if let Err(_) = self {
-            if let Err(e) = ctx.send_raw(chat_id, msg).await {
+            if let Err(e) = bot.send_raw(chat_id, msg).await {
                 tracing::error!("Failed to send error msg: {e}")
             }
         }
