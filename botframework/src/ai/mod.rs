@@ -47,14 +47,14 @@ impl ChatCompletionResponseTrait for CreateChatCompletionResponse {
 }
 
 #[derive(Clone)]
-pub struct AiService<A: AiProvider> {
+pub struct AiService<A: AiProvider + Sync> {
     client: async_openai::Client<async_openai::config::OpenAIConfig>,
     prompt: String,
     ai_tools: Vec<ChatCompletionTools>,
     _phantom: PhantomData<A>,
 }
 
-impl<A: AiProvider> AiService<A> {
+impl<A: AiProvider + Sync> AiService<A> {
     pub fn new<'a>(
         groq_key: &'a str,
         ai_tools: Vec<ChatCompletionTools>,

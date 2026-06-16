@@ -1,20 +1,23 @@
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use teloxide::{
     Bot,
+    dispatching::UpdateFilterExt,
     net::Download,
     payloads::{AnswerCallbackQuerySetters, SendMessageSetters},
     requests::Requester,
     types::{
         CallbackQuery, ChatId, FileId, InlineKeyboardButton, InlineKeyboardMarkup, InputFile,
-        MaybeInaccessibleMessage, MessageId, ParseMode, User, UserId,
+        MaybeInaccessibleMessage, MessageId, ParseMode, Update, User, UserId,
     },
 };
+use tokio::sync::RwLock;
 
 // Re-export derive macros when the 'derive' feature is enabled
 #[cfg(feature = "derive")]
@@ -186,8 +189,9 @@ mod md_replace {
 }
 
 pub use md_replace::escape_md;
+use tracing::error;
 
-use crate::ai::{AiService, GroqProvider};
+use crate::ai::{AiProvider, AiService};
 
 #[derive(Clone)]
 pub struct TgBot {
@@ -397,10 +401,10 @@ impl TgBot {
         Ok(None)
     }
 
-    pub async fn process_msg(
+    pub async fn process_msg<A: AiProvider + Sync>(
         &self,
         msg: teloxide::types::Message,
-        ai: &AiService<GroqProvider>,
+        ai: &AiService<A>,
     ) -> Result<Option<Message>> {
         let chat_id = msg.chat.id;
         let username = msg
@@ -449,12 +453,12 @@ impl TgBot {
     }
 
     /// Handle voice message - download and transcribe
-    async fn handle_voice_message(
+    async fn handle_voice_message<A: AiProvider + Sync>(
         &self,
         chat_id: ChatId,
         voice: &teloxide::types::Voice,
         username: &str,
-        ai: &AiService<GroqProvider>,
+        ai: &AiService<A>,
     ) -> Result<Option<Message>> {
         // Check duration as a proxy for file size (max ~5 min = ~5MB at typical compression)
         if voice.duration.seconds() > 300 {
@@ -531,4 +535,101 @@ impl TgBot {
             }
         }
     }
+}
+
+pub trait SimpleBotDispatch<A: AiProvider + Sync + Send> {
+    fn process_message(&self, msg: Message) -> impl std::future::Future<Output = Result<()>> + Send;
+
+    fn handle_callback(
+        &self,
+        data: &str,
+        query_msg: Option<MaybeInaccessibleMessage>,
+    ) -> impl std::future::Future<Output = Result<()>> + Send;
+
+    fn is_allowed(&self, username: &str) -> impl std::future::Future<Output = Result<bool>> + Send;
+
+    fn get_ai_service(&self) -> &AiService<A>;
+
+    fn get_bot(&self) -> &TgBot;
+}
+
+/// Start the bot dispatcher
+pub async fn start_bot<
+    D: SimpleBotDispatch<A> + Sync + Send + 'static,
+    A: AiProvider + Sync + Send + Clone + 'static,
+>(
+    context: Arc<RwLock<D>>,
+) -> Result<()> {
+    use teloxide::dispatching::Dispatcher;
+
+    let bot = {
+        let ctx = context.read().await;
+        ctx.get_bot().clone()
+    };
+
+    let message_handler = Update::filter_message().endpoint({
+        let ctx = Arc::clone(&context);
+        let bot = bot.clone();
+        let ai = ctx.read().await.get_ai_service().clone();
+
+        move |_bot: Bot, msg: teloxide::prelude::Message| {
+            let ctx = Arc::clone(&ctx);
+            let bot = bot.clone();
+            let ai = ai.clone();
+
+            async move {
+                match bot.process_msg(msg, &ai).await {
+                    Ok(Some(app_msg)) => {
+                        if let Err(e) = ctx.read().await.process_message(app_msg).await {
+                            error!("Error handling message: {}", e);
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        error!("Error handling message: {}", e);
+                    }
+                }
+                Ok::<(), anyhow::Error>(())
+            }
+        }
+    });
+
+    let callback_handler = Update::filter_callback_query().endpoint({
+        let ctx = Arc::clone(&context);
+        move |_bot: Bot, query: CallbackQuery| {
+            let ctx = Arc::clone(&ctx);
+            async move {
+                // Clone ctx for the permission callback
+                let ctx_for_cb = Arc::clone(&ctx);
+                let is_allowed = move |username: String| async move {
+                    ctx_for_cb
+                        .read()
+                        .await
+                        .is_allowed(&username)
+                        .await
+                        .unwrap_or(false)
+                };
+                let bot = ctx.read().await.get_bot().clone();
+                match bot.handle_callback(query, is_allowed).await {
+                    Ok(Some((c, query_msg))) => {
+                        if let Err(e) = ctx.read().await.handle_callback(&c, query_msg).await {
+                            error!("Error handling callback: {}", e)
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(e) => error!("Error handling callback: {}", e),
+                }
+                Ok::<(), anyhow::Error>(())
+            }
+        }
+    });
+
+    let handler = message_handler.branch(callback_handler);
+
+    Dispatcher::builder(bot.get_inner(), handler)
+        .build()
+        .dispatch()
+        .await;
+
+    Ok(())
 }
