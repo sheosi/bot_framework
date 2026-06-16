@@ -538,13 +538,17 @@ impl TgBot {
 }
 
 pub trait SimpleBotDispatch<A: AiProvider + Sync + Send> {
-    fn process_message(&self, msg: Message) -> impl std::future::Future<Output = Result<()>> + Send;
+    fn process_message(&self, msg: Message)
+    -> impl std::future::Future<Output = Result<()>> + Send;
 
     fn handle_callback(
         &self,
-        data: &str,
-        query_msg: Option<MaybeInaccessibleMessage>,
-    ) -> impl std::future::Future<Output = Result<()>> + Send;
+        _data: &str,
+        _query_msg: Option<MaybeInaccessibleMessage>,
+    ) -> impl std::future::Future<Output = Result<()>> + Send {
+        tracing::info!("Received a callback, not yet implemented");
+        std::future::ready(Ok(()))
+    }
 
     fn is_allowed(&self, username: &str) -> impl std::future::Future<Output = Result<bool>> + Send;
 
