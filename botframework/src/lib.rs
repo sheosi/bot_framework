@@ -42,6 +42,6 @@ pub struct Cli {
 
 #[derive(serde::Deserialize)]
 pub struct ToolData<'a> {
-    name: &'a str,
-    arguments: &'a str,
+    pub name: &'a str,
+    pub arguments: &'a str,
 }
