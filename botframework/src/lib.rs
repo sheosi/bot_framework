@@ -39,3 +39,9 @@ pub struct Cli {
     #[arg(long = "migrate")]
     pub migrate: bool,
 }
+
+#[derive(serde::Deserialize)]
+pub struct ToolData<'a> {
+    name: &'a str,
+    arguments: &'a str,
+}
