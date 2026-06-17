@@ -545,7 +545,7 @@ pub trait SimpleBotDispatch<A: AiProvider + Sync + Send> {
     ) -> impl std::future::Future<Output = Result<()>> + Send;
 
     fn handle_callback(
-        &self,
+        &mut self,
         _data: &str,
         _query_msg: Option<MaybeInaccessibleMessage>,
     ) -> impl std::future::Future<Output = Result<()>> + Send {
@@ -619,7 +619,7 @@ pub async fn start_bot<
                 let bot = ctx.read().await.get_bot().clone();
                 match bot.handle_callback(query, is_allowed).await {
                     Ok(Some((c, query_msg))) => {
-                        if let Err(e) = ctx.read().await.handle_callback(&c, query_msg).await {
+                        if let Err(e) = ctx.write().await.handle_callback(&c, query_msg).await {
                             error!("Error handling callback: {}", e)
                         }
                     }
