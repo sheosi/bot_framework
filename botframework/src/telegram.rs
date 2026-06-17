@@ -690,7 +690,7 @@ fn get_tool_calls(
 
 pub trait HistoryStore {
     fn push_history(
-        &mut self,
+        &self,
         chat_id: ChatId,
         text: String,
         answer: String,
