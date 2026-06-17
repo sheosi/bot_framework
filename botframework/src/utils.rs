@@ -70,7 +70,7 @@ impl<T, E> ErrMsg for Result<T, E> {
     }
 }
 
-async fn db_action<F, R>(db: &Pool, action: F) -> Result<R, anyhow::Error>
+pub async fn db_action<F, R>(db: &Pool, action: F) -> Result<R, anyhow::Error>
 where
     F: FnOnce(&mut Connection) -> Result<R, anyhow::Error> + Send + 'static,
     R: Send + 'static,
