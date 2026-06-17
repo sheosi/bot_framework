@@ -14,8 +14,8 @@ use teloxide::{
     payloads::{AnswerCallbackQuerySetters, SendMessageSetters},
     requests::Requester,
     types::{
-        CallbackQuery, ChatId, FileId, InlineKeyboardButton, InlineKeyboardMarkup, InputFile,
-        MaybeInaccessibleMessage, MessageId, ParseMode, Update, User, UserId,
+        CallbackQuery, ChatId, Document, FileId, InlineKeyboardButton, InlineKeyboardMarkup,
+        InputFile, MaybeInaccessibleMessage, MessageId, ParseMode, Update, User, UserId,
     },
 };
 use tokio::sync::RwLock;
@@ -154,6 +154,12 @@ pub enum ToolCallAction {
     MarkDown(String),
     Confirm(String, String),
     List { msg: String, items: Vec<String> },
+    File { msg: Option<String>, file: FileRep },
+}
+
+pub enum FileRep {
+    Path(PathBuf),
+    Raw(Vec<u8>),
 }
 
 impl From<String> for ToolCallAction {
@@ -174,6 +180,7 @@ pub struct Message {
     pub chat_id: ChatId,
     pub text: String,
     pub username: String,
+    pub document: Option<Document>,
 }
 
 mod md_replace {
@@ -332,6 +339,25 @@ impl TgBot {
         Ok(())
     }
 
+    pub async fn send_file(
+        &self,
+        chat_id: ChatId,
+        file: FileRep,
+        msg: Option<String>,
+    ) -> Result<()> {
+        if let Some(caption) = msg {
+            self.bot.send_message(chat_id, caption).await?;
+        }
+
+        let input = match file {
+            FileRep::Path(path) => InputFile::file(path),
+            FileRep::Raw(data) => InputFile::memory(data),
+        };
+
+        self.bot.send_document(chat_id, input).await?;
+        Ok(())
+    }
+
     /// Download file from Telegram
     pub async fn get_file(&self, file_id: FileId, path: &Path) -> Result<()> {
         let file = self.bot.get_file(file_id).await?;
@@ -450,6 +476,7 @@ impl TgBot {
             chat_id,
             text: text.to_string(),
             username,
+            document: msg.document().cloned(),
         }))
     }
 
@@ -478,6 +505,7 @@ impl TgBot {
                 chat_id,
                 text: transcription,
                 username: username.to_string(),
+                document: None,
             })),
             Err(e) => {
                 tracing::warn!("Failed to transcribe voice: {}", e);
@@ -663,6 +691,11 @@ pub async fn perform_tool_action(action: Result<ToolCallAction>, bot: &TgBot, ch
         Ok(List { msg: text, items }) => {
             if let Err(e) = bot.send_custom_list(chat_id, text, items).await {
                 tracing::error!("Failed to send custom list: {e}")
+            }
+        }
+        Ok(File { msg: text, file }) => {
+            if let Err(e) = bot.send_file(chat_id, file, text).await {
+                tracing::error!("Failed to send file: {e}")
             }
         }
         Err(e) => {

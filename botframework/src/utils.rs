@@ -73,7 +73,9 @@ impl<T, E> ErrMsg for Result<T, E> {
 
 pub async fn db_action<F, R>(db: &Pool, action: F) -> Result<R, anyhow::Error>
 where
-    F: FnOnce(&mut deadpool_sqlite::rusqlite::Connection) -> Result<R, anyhow::Error> + Send + 'static,
+    F: FnOnce(&mut deadpool_sqlite::rusqlite::Connection) -> Result<R, anyhow::Error>
+        + Send
+        + 'static,
     R: Send + 'static,
 {
     db.get()
