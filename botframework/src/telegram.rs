@@ -539,8 +539,10 @@ impl TgBot {
 }
 
 pub trait SimpleBotDispatch<A: AiProvider + Sync + Send> {
-    fn process_message(&self, msg: Message)
-    -> impl std::future::Future<Output = Result<()>> + Send;
+    fn process_message(
+        &mut self,
+        msg: Message,
+    ) -> impl std::future::Future<Output = Result<()>> + Send;
 
     fn handle_callback(
         &self,
@@ -585,7 +587,7 @@ pub async fn start_bot<
             async move {
                 match bot.process_msg(msg, &ai).await {
                     Ok(Some(app_msg)) => {
-                        if let Err(e) = ctx.read().await.process_message(app_msg).await {
+                        if let Err(e) = ctx.write().await.process_message(app_msg).await {
                             error!("Error handling message: {}", e);
                         }
                     }
