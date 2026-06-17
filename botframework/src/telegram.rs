@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Context;
+use async_openai::types::chat::ChatCompletionMessageToolCalls;
 use chrono::{DateTime, Utc};
 use teloxide::{
     Bot,
@@ -672,4 +673,74 @@ pub async fn perform_tool_action(action: Result<ToolCallAction>, bot: &TgBot, ch
             }
         }
     }
+}
+
+/// This makes sure we don't get an empty tool call set, which might happen
+fn get_tool_calls(
+    tool_calls: Option<Vec<ChatCompletionMessageToolCalls>>,
+) -> Option<Vec<ChatCompletionMessageToolCalls>> {
+    if let Some(tool_calls) = tool_calls {
+        if !tool_calls.is_empty() {
+            return Some(tool_calls);
+        }
+    }
+
+    None
+}
+
+pub trait HistoryStore {
+    fn push_history(
+        &mut self,
+        chat_id: ChatId,
+        text: String,
+        answer: String,
+    ) -> impl std::future::Future<Output = Result<()>>;
+
+    fn get_history(
+        &self,
+        user_id: ChatId,
+    ) -> impl std::future::Future<Output = Result<Vec<(String, String)>>>;
+}
+
+/// Process AI message and return tool call if any
+/// Uses the new AI service with async_openai
+pub async fn process_ai<H: HistoryStore, A: AiProvider + Send + Sync>(
+    history_store: &mut H,
+    ai_service: &AiService<A>,
+    bot: &TgBot,
+    chat_id: ChatId,
+    text: String,
+    with_tools: bool,
+) -> Result<Option<Vec<ChatCompletionMessageToolCalls>>> {
+    let history = history_store.get_history(chat_id).await?;
+    let text_clone = text.to_string();
+    let res = ai_service.input(text, history, with_tools).await?;
+    let (res, response_text) = if let Some(tool_calls) = get_tool_calls(res.tool_calls) {
+        let text = if let ChatCompletionMessageToolCalls::Function(f) =
+            tool_calls.first().expect("Why is there no tool_call?")
+        {
+            Some(format!("Tool call: {}", &f.function.name))
+        } else {
+            None
+        };
+
+        (Some(tool_calls), text)
+    } else {
+        bot.send_md(
+            chat_id,
+            res.content
+                .as_deref()
+                .unwrap_or_else(|| "Disculpa, ha habido un error interno con la IA"),
+        )
+        .await?;
+        (None, res.content)
+    };
+
+    if let Some(response_text) = response_text {
+        history_store
+            .push_history(chat_id, text_clone, response_text)
+            .await?;
+    }
+
+    Ok(res)
 }
