@@ -705,7 +705,7 @@ pub trait HistoryStore {
 /// Process AI message and return tool call if any
 /// Uses the new AI service with async_openai
 pub async fn process_ai<H: HistoryStore, A: AiProvider + Send + Sync>(
-    history_store: &mut H,
+    history_store: &H,
     ai_service: &AiService<A>,
     bot: &TgBot,
     chat_id: ChatId,
