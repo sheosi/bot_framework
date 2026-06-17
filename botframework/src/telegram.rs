@@ -637,3 +637,39 @@ pub async fn start_bot<
 
     Ok(())
 }
+
+pub async fn perform_tool_action(action: Result<ToolCallAction>, bot: &TgBot, chat_id: ChatId) {
+    use ToolCallAction::*;
+
+    match action {
+        Ok(Confirm(text, callback_data)) => {
+            if let Err(e) = bot.send_confirm(chat_id, &text, &callback_data).await {
+                tracing::error!("Failed to send confirm msg: {e}")
+            }
+        }
+        Ok(MarkDown(text)) => {
+            if let Err(e) = bot.send_md(chat_id, &text).await {
+                tracing::error!("Failed to send markdown msg: {e:?}")
+            }
+        }
+        Ok(Message(text)) => {
+            if let Err(e) = bot.send_raw(chat_id, &text).await {
+                tracing::error!("Failed to send normal msg: {e}")
+            }
+        }
+        Ok(List { msg: text, items }) => {
+            if let Err(e) = bot.send_custom_list(chat_id, text, items).await {
+                tracing::error!("Failed to send custom list: {e}")
+            }
+        }
+        Err(e) => {
+            tracing::error!("Tool error {e}");
+            if let Err(e) = bot
+                .send_raw(chat_id, "Ha habido un problema con su petición")
+                .await
+            {
+                tracing::error!("Failed to send error msg: {e}")
+            }
+        }
+    }
+}
