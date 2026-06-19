@@ -350,7 +350,19 @@ impl TgBot {
         }
 
         let input = match file {
-            FileRep::Path(path) => InputFile::file(path),
+            FileRep::Path(path) => {
+                if !path.exists() {
+                    self.bot
+                        .send_message(
+                            chat_id,
+                            "No puedo enviar el archivo ya que no existe internamente",
+                        )
+                        .await?;
+
+                    return Ok(());
+                }
+                InputFile::file(path)
+            }
             FileRep::Raw(data) => InputFile::memory(data),
         };
 
