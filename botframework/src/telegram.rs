@@ -627,6 +627,7 @@ pub async fn start_bot<
             async move {
                 match bot.process_msg(msg, &ai).await {
                     Ok(Some(app_msg)) => {
+                        tracing::info!("A");
                         if let Err(e) = ctx.write().await.process_message(app_msg).await {
                             error!("Error handling message: {}", e);
                         }
