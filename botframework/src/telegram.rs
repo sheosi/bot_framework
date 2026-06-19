@@ -11,7 +11,7 @@ use teloxide::{
     Bot,
     dispatching::UpdateFilterExt,
     net::Download,
-    payloads::{AnswerCallbackQuerySetters, SendMessageSetters},
+    payloads::{AnswerCallbackQuerySetters, SendDocumentSetters, SendMessageSetters},
     requests::Requester,
     types::{
         CallbackQuery, ChatId, Document, FileId, InlineKeyboardButton, InlineKeyboardMarkup,
@@ -345,10 +345,6 @@ impl TgBot {
         file: FileRep,
         msg: Option<String>,
     ) -> Result<()> {
-        if let Some(caption) = msg {
-            self.bot.send_message(chat_id, caption).await?;
-        }
-
         let input = match file {
             FileRep::Path(path) => {
                 if !path.exists() {
@@ -366,7 +362,13 @@ impl TgBot {
             FileRep::Raw(data) => InputFile::memory(data),
         };
 
-        self.bot.send_document(chat_id, input).await?;
+        let mut send_doc = self.bot.send_document(chat_id, input);
+
+        if let Some(caption) = msg {
+            send_doc = send_doc.caption(caption);
+        }
+
+        send_doc.await?;
         Ok(())
     }
 
@@ -466,7 +468,10 @@ impl TgBot {
                 .await;
         } else if let Some(text) = msg.text() {
             text.to_string()
+        } else if let Some(caption) = msg.caption() {
+            caption.to_string()
         } else {
+            tracing::info!("No message found");
             return Ok(None);
         };
 
@@ -623,7 +628,6 @@ pub async fn start_bot<
             let ctx = Arc::clone(&ctx);
             let bot = bot.clone();
             let ai = ai.clone();
-
             async move {
                 match bot.process_msg(msg, &ai).await {
                     Ok(Some(app_msg)) => {
