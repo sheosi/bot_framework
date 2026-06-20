@@ -715,7 +715,7 @@ pub async fn perform_tool_action(action: Result<ToolCallAction>, bot: &TgBot, ch
             }
         }
         Err(e) => {
-            tracing::error!("Tool error {e}");
+            tracing::error!("Tool error {e:?}");
             if let Err(e) = bot
                 .send_raw(chat_id, "Ha habido un problema con su petición")
                 .await
