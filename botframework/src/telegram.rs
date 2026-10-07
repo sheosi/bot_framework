@@ -200,7 +200,7 @@ mod md_replace {
 }
 
 pub use md_replace::escape_md;
-use tracing::error;
+use tracing::{error, info};
 
 use crate::ai::{AiProvider, AiService};
 
@@ -597,11 +597,11 @@ impl TgBot {
                 let now = Utc::now();
                 pending_grd.retain(|_, op| op.expires > now);
 
-                match self.pending_confirm.lock().await.remove(uuid) {
+                match pending_grd.remove(uuid) {
                     Some(pending_op) =>
                     // Check for pending operation
                     {
-                        Ok(Some((pending_op.data, pending_op.tool, query.message)))
+                        Ok(Some((pending_op.tool, pending_op.data, query.message)))
                     }
                     None => {
                         if let Some(msg) = query.message {
@@ -630,7 +630,7 @@ pub trait SimpleBotDispatch<A: AiProvider + Sync + Send> {
         &mut self,
         _tool: &str,
         _data: &str,
-        _query_msg: Option<MaybeInaccessibleMessage>,
+        _query_msg: MaybeInaccessibleMessage,
     ) -> impl std::future::Future<Output = Result<()>> + Send {
         tracing::info!("Received a callback, not yet implemented");
         std::future::ready(Ok(()))
@@ -702,15 +702,19 @@ pub async fn start_bot<
                 // We read and clone first to avoid a later deadlock in handle_callback
                 let bot = ctx.read().await.get_bot().clone();
                 match bot.handle_callback(query, is_allowed).await {
-                    Ok(Some((c, tool, query_msg))) => {
+                    Ok(Some((tool, data, Some(query_msg)))) => {
+                        tracing::info!(tool,);
                         if let Err(e) = ctx
                             .write()
                             .await
-                            .handle_callback(&c, &tool, query_msg)
+                            .handle_callback(&tool, &data, query_msg)
                             .await
                         {
                             error!("Error handling callback: {}", e)
                         }
+                    }
+                    Ok(Some((_, _, None))) => {
+                        info!("Got inaccesible message")
                     }
                     Ok(None) => {}
                     Err(e) => error!("Error handling callback: {}", e),
