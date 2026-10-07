@@ -10,6 +10,7 @@ use chrono::{DateTime, Duration, Utc};
 use teloxide::{
     Bot,
     dispatching::UpdateFilterExt,
+    dptree,
     net::Download,
     payloads::{AnswerCallbackQuerySetters, SendDocumentSetters, SendMessageSetters},
     requests::Requester,
@@ -697,11 +698,17 @@ pub async fn start_bot<
                         .await
                         .unwrap_or(false)
                 };
-                println!("tiro finale");
-                let mut mut_ctx = ctx.write().await;
-                match mut_ctx.get_bot().handle_callback(query, is_allowed).await {
+
+                // We read and clone first to avoid a later deadlock in handle_callback
+                let bot = ctx.read().await.get_bot().clone();
+                match bot.handle_callback(query, is_allowed).await {
                     Ok(Some((c, tool, query_msg))) => {
-                        if let Err(e) = mut_ctx.handle_callback(&c, &tool, query_msg).await {
+                        if let Err(e) = ctx
+                            .write()
+                            .await
+                            .handle_callback(&c, &tool, query_msg)
+                            .await
+                        {
                             error!("Error handling callback: {}", e)
                         }
                     }
@@ -713,9 +720,12 @@ pub async fn start_bot<
         }
     });
 
-    let handler = message_handler.branch(callback_handler);
+    let bot_tree = dptree::entry()
+        .branch(message_handler)
+        .branch(callback_handler);
 
-    Dispatcher::builder(bot.get_inner(), handler)
+    Dispatcher::builder(bot.get_inner(), bot_tree)
+        .dependencies(dptree::deps![context.clone()])
         .build()
         .dispatch()
         .await;
