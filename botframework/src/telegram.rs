@@ -6,7 +6,7 @@ use std::{
 
 use anyhow::Context;
 use async_openai::types::chat::ChatCompletionMessageToolCalls;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use teloxide::{
     Bot,
     dispatching::UpdateFilterExt,
@@ -18,7 +18,9 @@ use teloxide::{
         InputFile, MaybeInaccessibleMessage, MessageId, ParseMode, Update, User, UserId,
     },
 };
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
+
+const PENDING_OPERATION_TIMEOUT_MINUTES: i64 = 30;
 
 // Re-export derive macros when the 'derive' feature is enabled
 #[cfg(feature = "derive")]
@@ -143,9 +145,9 @@ impl PropertyKind {
 
 /// Delayed action for callback handling
 #[derive(Debug, Clone)]
-pub struct DelayedAction {
-    pub action: String,
-    pub target: String,
+struct PendingOp {
+    pub tool: String,
+    pub data: String,
     pub expires: DateTime<Utc>,
 }
 
@@ -201,17 +203,17 @@ use tracing::error;
 
 use crate::ai::{AiProvider, AiService};
 
-#[derive(Clone)]
 pub struct TgBot {
     bot: Bot,
     username: String,
     id: UserId,
+    pending_confirm: Mutex<HashMap<String, PendingOp>>,
 }
 
 type Result<T> = core::result::Result<T, anyhow::Error>;
 
 impl TgBot {
-    pub async fn new(key: String) -> Self {
+    pub async fn new(key: String) -> Arc<Self> {
         let bot = Bot::new(key);
 
         let this_bot = bot.get_me().await.expect("Failed to get self bot");
@@ -220,11 +222,12 @@ impl TgBot {
             .clone()
             .expect("Me returned but had no name");
 
-        Self {
+        Arc::new(Self {
             bot,
             username,
             id: this_bot.id,
-        }
+            pending_confirm: Mutex::new(HashMap::new()),
+        })
     }
 
     pub fn get_inner(&self) -> Bot {
@@ -262,10 +265,21 @@ impl TgBot {
         &self,
         chat_id: ChatId,
         text: &str,
+        tool: &str,
         callback_data: &str,
     ) -> Result<MessageId> {
+        let id = uuid::Uuid::new_v4().to_string();
+        self.pending_confirm.lock().await.insert(
+            id.clone(),
+            PendingOp {
+                tool: tool.to_string(),
+                data: callback_data.to_string(),
+                expires: Utc::now() + Duration::minutes(PENDING_OPERATION_TIMEOUT_MINUTES),
+            },
+        );
+
         let keyboard = InlineKeyboardMarkup::new(vec![vec![
-            InlineKeyboardButton::callback("✅ Confirmar", callback_data.to_string()),
+            InlineKeyboardButton::callback("✅ Confirmar", id),
             InlineKeyboardButton::callback("❌ Cancelar", "{}".to_string()),
         ]]);
 
@@ -533,11 +547,11 @@ impl TgBot {
     }
 
     /// Handle callback query from inline keyboard
-    pub async fn handle_callback(
+    async fn handle_callback(
         &self,
         query: CallbackQuery,
         check_allowed: impl AsyncFnOnce(String) -> bool + Send,
-    ) -> Result<Option<(String, Option<MaybeInaccessibleMessage>)>> {
+    ) -> Result<Option<(String, String, Option<MaybeInaccessibleMessage>)>> {
         let username = query.from.username.clone().unwrap_or_default();
 
         // Acknowledge the callback
@@ -575,9 +589,31 @@ impl TgBot {
                 }
                 Ok(None)
             }
-            _ => {
-                // Check for pending operation
-                Ok(Some((data, query.message)))
+            uuid => {
+                let mut pending_grd = self.pending_confirm.lock().await;
+
+                // Clean expired operations
+                let now = Utc::now();
+                pending_grd.retain(|_, op| op.expires > now);
+
+                match self.pending_confirm.lock().await.remove(uuid) {
+                    Some(pending_op) =>
+                    // Check for pending operation
+                    {
+                        Ok(Some((pending_op.data, pending_op.tool, query.message)))
+                    }
+                    None => {
+                        if let Some(msg) = query.message {
+                            self.replace_confirm(
+                                msg.chat().id,
+                                msg.id(),
+                                "Esta operación ya no está accesible",
+                            )
+                            .await?;
+                        }
+                        Ok(None)
+                    }
+                }
             }
         }
     }
@@ -591,6 +627,7 @@ pub trait SimpleBotDispatch<A: AiProvider + Sync + Send> {
 
     fn handle_callback(
         &mut self,
+        _tool: &str,
         _data: &str,
         _query_msg: Option<MaybeInaccessibleMessage>,
     ) -> impl std::future::Future<Output = Result<()>> + Send {
@@ -602,7 +639,7 @@ pub trait SimpleBotDispatch<A: AiProvider + Sync + Send> {
 
     fn get_ai_service(&self) -> &AiService<A>;
 
-    fn get_bot(&self) -> &TgBot;
+    fn get_bot(&self) -> &Arc<TgBot>;
 }
 
 /// Start the bot dispatcher
@@ -660,10 +697,11 @@ pub async fn start_bot<
                         .await
                         .unwrap_or(false)
                 };
-                let bot = ctx.read().await.get_bot().clone();
-                match bot.handle_callback(query, is_allowed).await {
-                    Ok(Some((c, query_msg))) => {
-                        if let Err(e) = ctx.write().await.handle_callback(&c, query_msg).await {
+                println!("tiro finale");
+                let mut mut_ctx = ctx.write().await;
+                match mut_ctx.get_bot().handle_callback(query, is_allowed).await {
+                    Ok(Some((c, tool, query_msg))) => {
+                        if let Err(e) = mut_ctx.handle_callback(&c, &tool, query_msg).await {
                             error!("Error handling callback: {}", e)
                         }
                     }
@@ -685,12 +723,20 @@ pub async fn start_bot<
     Ok(())
 }
 
-pub async fn perform_tool_action(action: Result<ToolCallAction>, bot: &TgBot, chat_id: ChatId) {
+pub async fn perform_tool_action(
+    action: Result<ToolCallAction>,
+    tool_name: &str,
+    bot: &TgBot,
+    chat_id: ChatId,
+) {
     use ToolCallAction::*;
 
     match action {
         Ok(Confirm(text, callback_data)) => {
-            if let Err(e) = bot.send_confirm(chat_id, &text, &callback_data).await {
+            if let Err(e) = bot
+                .send_confirm(chat_id, tool_name, &text, &callback_data)
+                .await
+            {
                 tracing::error!("Failed to send confirm msg: {e}")
             }
         }
