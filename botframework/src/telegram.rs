@@ -703,7 +703,6 @@ pub async fn start_bot<
                 let bot = ctx.read().await.get_bot().clone();
                 match bot.handle_callback(query, is_allowed).await {
                     Ok(Some((tool, data, Some(query_msg)))) => {
-                        tracing::info!(tool,);
                         if let Err(e) = ctx
                             .write()
                             .await
