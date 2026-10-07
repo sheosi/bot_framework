@@ -264,8 +264,8 @@ impl TgBot {
     pub async fn send_confirm(
         &self,
         chat_id: ChatId,
-        text: &str,
         tool: &str,
+        text: &str,
         callback_data: &str,
     ) -> Result<MessageId> {
         let id = uuid::Uuid::new_v4().to_string();
