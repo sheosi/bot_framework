@@ -15,8 +15,9 @@ use teloxide::{
     payloads::{AnswerCallbackQuerySetters, SendDocumentSetters, SendMessageSetters},
     requests::Requester,
     types::{
-        CallbackQuery, ChatId, Document, FileId, InlineKeyboardButton, InlineKeyboardMarkup,
-        InputFile, MaybeInaccessibleMessage, MessageId, ParseMode, Update, User, UserId,
+        CallbackQuery, ChatAction, ChatId, Document, FileId, InlineKeyboardButton,
+        InlineKeyboardMarkup, InputFile, MaybeInaccessibleMessage, MessageId, ParseMode, Update,
+        User, UserId,
     },
 };
 use tokio::sync::{Mutex, RwLock};
@@ -212,6 +213,22 @@ pub struct TgBot {
 }
 
 type Result<T> = core::result::Result<T, anyhow::Error>;
+
+/// How long to wait before showing the "typing" status the first time.
+const TYPING_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
+/// How often to refresh the status, since Telegram drops it after ~5 seconds.
+const TYPING_REFRESH: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// Keeps the "typing" status visible while it is alive.
+pub struct TypingGuard(Option<tokio::sync::oneshot::Sender<()>>);
+
+impl Drop for TypingGuard {
+    fn drop(&mut self) {
+        if let Some(tx) = self.0.take() {
+            let _ = tx.send(());
+        }
+    }
+}
 
 impl TgBot {
     pub async fn new(key: String) -> Arc<Self> {
@@ -409,6 +426,41 @@ impl TgBot {
 
     pub fn get_bot_id(&self) -> UserId {
         self.id
+    }
+
+    /// Spawn a background task showing the "typing" status for `chat_id`.
+    ///
+    /// The first status is sent after [`TYPING_DELAY`] and refreshed every
+    /// [`TYPING_REFRESH`] afterwards, since Telegram clears it after ~5s.
+    /// Dropping the returned guard stops the indicator.
+    pub fn start_typing(self: &Arc<Self>, chat_id: ChatId) -> TypingGuard {
+        let (tx, mut rx) = tokio::sync::oneshot::channel();
+        let bot = Arc::clone(self);
+
+        tokio::spawn(async move {
+            let mut ticker = tokio::time::interval_at(
+                tokio::time::Instant::now() + TYPING_DELAY,
+                TYPING_REFRESH,
+            );
+
+            loop {
+                tokio::select! {
+                    _ = &mut rx => break,
+                    _ = ticker.tick() => {
+                        if bot
+                            .bot
+                            .send_chat_action(chat_id, ChatAction::Typing)
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+
+        TypingGuard(Some(tx))
     }
 
     pub async fn send_document<P: Into<PathBuf>>(&self, chat_id: ChatId, file: P) -> Result<()> {
@@ -667,6 +719,8 @@ pub async fn start_bot<
             let bot = bot.clone();
             let ai = ai.clone();
             async move {
+                let _typing = bot.start_typing(msg.chat.id);
+
                 match bot.process_msg(msg, &ai).await {
                     Ok(Some(app_msg)) => {
                         if let Err(e) = ctx.write().await.process_message(app_msg).await {
