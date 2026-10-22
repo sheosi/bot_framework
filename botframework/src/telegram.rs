@@ -266,7 +266,7 @@ impl TgBot {
         Ok(msg.id)
     }
 
-    /// Send markdown message
+    /// Send Telegram MarkdownV2 message.
     pub async fn send_md(&self, chat_id: ChatId, text: &str) -> Result<MessageId> {
         let text = escape_md(text);
         let msg = self
@@ -275,6 +275,18 @@ impl TgBot {
             .parse_mode(ParseMode::MarkdownV2)
             .await
             .context("Failed to send markdown message")?;
+        Ok(msg.id)
+    }
+
+    /// Send standard Markdown, converting it to Telegram MarkdownV2.
+    pub async fn send_markdown(&self, chat_id: ChatId, text: &str) -> Result<MessageId> {
+        let text = crate::md_to_tg::markdown_to_telegram(text);
+        let msg = self
+            .bot
+            .send_message(chat_id, &text)
+            .parse_mode(ParseMode::MarkdownV2)
+            .await
+            .context("Failed to send converted markdown message")?;
         Ok(msg.id)
     }
 
@@ -890,7 +902,7 @@ pub async fn process_ai<H: HistoryStore, A: AiProvider + Send + Sync>(
 
         (Some(tool_calls), text)
     } else {
-        bot.send_md(
+        bot.send_markdown(
             chat_id,
             res.content
                 .as_deref()

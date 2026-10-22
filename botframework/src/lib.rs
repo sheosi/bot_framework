@@ -4,6 +4,7 @@ use dotenvy::dotenv;
 pub mod ai;
 pub mod api;
 pub mod infisical;
+pub mod md_to_tg;
 pub mod telegram;
 pub mod utils;
 
