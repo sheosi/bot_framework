@@ -201,7 +201,7 @@ mod md_replace {
 }
 
 pub use md_replace::escape_md;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::ai::{AiProvider, AiService};
 
@@ -934,4 +934,74 @@ pub async fn process_ai<H: HistoryStore, A: AiProvider + Send + Sync>(
     }
 
     Ok(res)
+}
+
+pub async fn handle_callback_result(
+    bot: &TgBot,
+    chat_id: ChatId,
+    message_id: MessageId,
+    res: anyhow::Result<String>,
+) {
+    match res {
+        Ok(text) => {
+            let _ = bot.replace_confirm(chat_id, message_id, &text).await;
+        }
+        Err(e) => {
+            tracing::error!("Error handling callback: {e}");
+            let _ = bot
+                .send_raw(chat_id, "Error al procesar la confirmación.")
+                .await;
+        }
+    }
+}
+
+pub struct ToolMap<T>(HashMap<String, Arc<T>>);
+
+impl<T> ToolMap<T> {
+    pub fn new(dict: HashMap<String, Arc<T>>) -> Self {
+        Self(dict)
+    }
+
+    /// Look up a tool by name.
+    ///
+    /// The `Arc` is cloned on purpose: the borrow of the map ends with this
+    /// statement, so the caller can then pass `&mut AppContext` to the tool
+    /// without conflicting with the borrow of `AppContext::tools`.
+    ///
+    /// In case the tool isn't found will notify of the error
+    pub async fn get_for_call(&self, name: &str, bot: &TgBot, chat_id: ChatId) -> Option<Arc<T>> {
+        match self.0.get(name).cloned() {
+            Some(v) => Some(v),
+            None => {
+                warn!("Unknown tool called: {}", name);
+                if let Err(e) = bot
+                    .send_raw(chat_id, "Disculpa, no reconozco esa herramienta.")
+                    .await
+                {
+                    tracing::error!("Failed to send error msg: {e}")
+                }
+
+                None
+            }
+        }
+    }
+
+    pub async fn get_for_callback(
+        &self,
+        name: &str,
+        bot: &TgBot,
+        chat_id: ChatId,
+        message_id: MessageId,
+    ) -> Option<Arc<T>> {
+        match self.0.get(name).cloned() {
+            Some(v) => Some(v),
+            None => {
+                warn!("Unknown tool: {name}");
+                let _ = bot
+                    .replace_confirm(chat_id, message_id, "Error: herramienta no encontrada.")
+                    .await;
+                return None;
+            }
+        }
+    }
 }
