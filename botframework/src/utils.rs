@@ -1,3 +1,6 @@
+#[cfg(debug_assertions)]
+use std::path::Path;
+
 use async_openai::types::chat::{ChatCompletionTools, FunctionObject};
 use deadpool_sqlite::Pool;
 use teloxide::types::ChatId;
@@ -84,4 +87,14 @@ where
         .interact(action)
         .await
         .map_err(|e| anyhow::Error::msg(e.to_string()))?
+}
+
+#[cfg(debug_assertions)]
+pub fn get_data() -> &'static Path {
+    Path::new("./data")
+}
+
+#[cfg(not(debug_assertions))]
+pub fn get_data() -> &'static Path {
+    Path::new("/data")
 }
