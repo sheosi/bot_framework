@@ -8,6 +8,16 @@ pub mod md_to_tg;
 pub mod telegram;
 pub mod utils;
 
+#[cfg(feature = "health_check")]
+fn try_run_health_check_api(cli: &Cli) {
+    if !cli.migrate && !cli.check {
+        api::run_healthcheck_api();
+    }
+}
+
+#[cfg(not(feature = "health_check"))]
+fn try_run_health_check_api(_cli: &Cli) {}
+
 /// Loads env vars and tracing
 pub fn init() -> Cli {
     // Load environment variables
@@ -18,7 +28,11 @@ pub fn init() -> Cli {
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .init();
 
-    Cli::parse()
+    let cli = Cli::parse();
+
+    try_run_health_check_api(&cli);
+
+    cli
 }
 
 pub fn get_port() -> u16 {
@@ -28,14 +42,25 @@ pub fn get_port() -> u16 {
         .unwrap_or(8079)
 }
 
+#[cfg(feature = "health_check")]
 #[derive(Parser)]
-#[command(name = "go7rs")]
-#[command(about = "Go7 Telegram Bot - Rust rewrite")]
+#[command(name = "botframework")]
+#[command(about = "A bot from botframework")]
 pub struct Cli {
     /// Run health check
     #[arg(long = "check")]
     pub check: bool,
 
+    /// Run database migrations
+    #[arg(long = "migrate")]
+    pub migrate: bool,
+}
+
+#[cfg(not(feature = "health_check"))]
+#[derive(Parser)]
+#[command(name = "botframework")]
+#[command(about = "A bot from botframework")]
+pub struct Cli {
     /// Run database migrations
     #[arg(long = "migrate")]
     pub migrate: bool,

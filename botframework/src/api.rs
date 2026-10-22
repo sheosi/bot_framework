@@ -1,6 +1,7 @@
 use axum::{Json, Router, http::StatusCode, response::IntoResponse, routing::get};
 use serde::Serialize;
 
+#[cfg(feature = "health_check")]
 use crate::{api, get_port};
 
 /// Health check response
@@ -26,6 +27,7 @@ async fn health_handler() -> impl IntoResponse {
     )
 }
 
+#[cfg(feature = "health_check")]
 /// Run the API server
 pub fn run_healthcheck_api() {
     // Get port for health check server

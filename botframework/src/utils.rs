@@ -5,6 +5,7 @@ use teloxide::types::ChatId;
 use crate::telegram::{Property, TgBot, props_to_json};
 
 /// Run health check
+#[cfg(feature = "health_check")]
 pub async fn run_health_check() -> Result<(), anyhow::Error> {
     use reqwest::Client;
 

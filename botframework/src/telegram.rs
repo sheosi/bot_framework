@@ -802,6 +802,21 @@ pub async fn start_bot<
     Ok(())
 }
 
+pub async fn run_bot<
+    D: SimpleBotDispatch<A> + Sync + Send + 'static,
+    A: AiProvider + Sync + Send + Clone + 'static,
+>(
+    context: Arc<RwLock<D>>,
+) -> Result<()> {
+    start_bot(context).await.expect("Failed to run bot");
+
+    // Shutdown signal handling
+    let _ = tokio::signal::ctrl_c().await;
+    tracing::info!("Shutting down...");
+
+    Ok(())
+}
+
 pub async fn perform_tool_action(
     action: Result<ToolCallAction>,
     tool_name: &str,
