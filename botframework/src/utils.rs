@@ -1,5 +1,6 @@
 #[cfg(debug_assertions)]
 use std::path::Path;
+use std::sync::LazyLock;
 
 use async_openai::types::chat::{ChatCompletionTools, FunctionObject};
 use deadpool_sqlite::Pool;
@@ -97,4 +98,25 @@ pub fn get_data() -> &'static Path {
 #[cfg(not(debug_assertions))]
 pub fn get_data() -> &'static Path {
     Path::new("/data")
+}
+
+pub fn http_client() -> &'static reqwest::Client {
+    static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+        use reqwest::header::{ACCEPT, HeaderMap, HeaderValue, USER_AGENT};
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            USER_AGENT,
+            HeaderValue::from_static(concat!(
+                env!("CARGO_PKG_NAME"),
+                "/",
+                env!("CARGO_PKG_VERSION")
+            )),
+        );
+        headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
+        reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .expect("Failed to build HTTP client")
+    });
+    &CLIENT
 }
